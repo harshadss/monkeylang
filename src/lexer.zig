@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const TokenType = enum {
+pub const TokenType = enum {
     ILLEGAL,
     EOF,
     // identifiers, literals
@@ -37,7 +37,7 @@ const TokenType = enum {
     RETURN,
 };
 
-const Token = struct {
+pub const Token = struct {
     token_type: TokenType,
     literal: []const u8,
 };
@@ -65,7 +65,7 @@ fn lookupIdent(ident: []const u8) TokenType {
     return Keywords.get(ident) orelse TokenType.IDENT;
 }
 
-const Lexer = struct {
+pub const Lexer = struct {
     input: []const u8, // string input code
     position: usize,
     read_position: usize,
