@@ -6,7 +6,7 @@ pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
     try stdout.print("Welcome to MonkeyLang!\n ", .{});
 
-    var buffer: [65536]u8 = undefined;
+    var buffer: [4096]u8 = undefined;
 
     while (true) {
         try stdout.print(">> ", .{});

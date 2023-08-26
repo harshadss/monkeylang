@@ -89,7 +89,7 @@ pub const Lexer = struct {
 
     fn readIdentifier(self: *Self) []const u8 {
         const posn = self.position;
-        while (isLetter(self.input[self.position])) {
+        while ((self.position < self.input.len) and (isLetter(self.input[self.position]))) {
             self.readChar();
         }
         return self.input[posn..self.position];
@@ -97,7 +97,7 @@ pub const Lexer = struct {
 
     fn readNumber(self: *Self) []const u8 {
         const posn = self.position;
-        while (isDigit(self.input[self.position])) {
+        while ((self.position < self.input.len) and (isDigit(self.input[self.position]))) {
             self.readChar();
         }
         return self.input[posn..self.position];
