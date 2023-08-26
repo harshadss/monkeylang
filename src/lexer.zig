@@ -9,6 +9,17 @@ const TokenType = enum {
     // operators
     ASSIGN,
     PLUS,
+    BANG,
+    MINUS,
+    ASTERISK,
+    SLASH,
+
+    LT,
+    GT,
+
+    EQ,
+    NOT_EQ,
+
     // delimiter
     COMMA,
     SEMICOLON,
@@ -19,6 +30,11 @@ const TokenType = enum {
     //keywords
     FUNCTION,
     LET,
+    TRUE,
+    FALSE,
+    IF,
+    ELSE,
+    RETURN,
 };
 
 const Token = struct {
@@ -38,6 +54,11 @@ const KKV = struct { []const u8, TokenType };
 const Keywords = std.ComptimeStringMap(TokenType, [_]KKV{
     .{ "fn", TokenType.FUNCTION },
     .{ "let", TokenType.LET },
+    .{ "if", TokenType.IF },
+    .{ "else", TokenType.ELSE },
+    .{ "true", TokenType.TRUE },
+    .{ "false", TokenType.FALSE },
+    .{ "return", TokenType.RETURN },
 });
 
 fn lookupIdent(ident: []const u8) TokenType {
@@ -102,7 +123,39 @@ const Lexer = struct {
         if (self.ch) |c| {
             switch (c) {
                 '=' => {
-                    tok = Token{ .token_type = TokenType.ASSIGN, .literal = "=" };
+                    if (self.peekChar() == '=') {
+                        // const ch = self.ch;
+                        self.readChar();
+                        tok = Token{ .token_type = TokenType.EQ, .literal = "==" };
+                    } else {
+                        tok = Token{ .token_type = TokenType.ASSIGN, .literal = "=" };
+                    }
+                },
+                '+' => {
+                    tok = Token{ .token_type = TokenType.PLUS, .literal = "+" };
+                },
+                '-' => {
+                    tok = Token{ .token_type = TokenType.MINUS, .literal = "-" };
+                },
+                '!' => {
+                    if (self.peekChar() == '=') {
+                        self.readChar();
+                        tok = Token{ .token_type = TokenType.NOT_EQ, .literal = "!=" };
+                    } else {
+                        tok = Token{ .token_type = TokenType.BANG, .literal = "!" };
+                    }
+                },
+                '*' => {
+                    tok = Token{ .token_type = TokenType.ASTERISK, .literal = "*" };
+                },
+                '/' => {
+                    tok = Token{ .token_type = TokenType.SLASH, .literal = "/" };
+                },
+                '<' => {
+                    tok = Token{ .token_type = TokenType.LT, .literal = "<" };
+                },
+                '>' => {
+                    tok = Token{ .token_type = TokenType.GT, .literal = ">" };
                 },
                 ';' => {
                     tok = Token{ .token_type = TokenType.SEMICOLON, .literal = ";" };
@@ -115,9 +168,6 @@ const Lexer = struct {
                 },
                 ',' => {
                     tok = Token{ .token_type = TokenType.COMMA, .literal = "," };
-                },
-                '+' => {
-                    tok = Token{ .token_type = TokenType.PLUS, .literal = "+" };
                 },
                 '{' => {
                     tok = Token{ .token_type = TokenType.LBRACE, .literal = "{" };
@@ -176,7 +226,20 @@ test "Lexer Test Next Token let bind" {
         \\let add = fn(x, y) {
         \\ x + y;
         \\};
+        \\
+        \\
         \\let result = add(five, ten);
+        \\!-/*5;
+        \\5 < 10 > 5 ;
+        \\
+        \\if (5 < 10) {
+        \\    return true;
+        \\} else {
+        \\    return false;
+        \\}
+        \\
+        \\ 10 == 10;
+        \\ 10 != 9;
     ;
 
     var code = Lexer.new(input);
@@ -222,12 +285,57 @@ test "Lexer Test Next Token let bind" {
         Token{ .token_type = TokenType.RPAREN, .literal = ")" },
         Token{ .token_type = TokenType.SEMICOLON, .literal = ";" },
 
+        Token{ .token_type = TokenType.BANG, .literal = "!" },
+        Token{ .token_type = TokenType.MINUS, .literal = "-" },
+        Token{ .token_type = TokenType.SLASH, .literal = "/" },
+        Token{ .token_type = TokenType.ASTERISK, .literal = "*" },
+        Token{ .token_type = TokenType.INT, .literal = "5" },
+        Token{ .token_type = TokenType.SEMICOLON, .literal = ";" },
+
+        //5 < 10 > 5 ;
+        Token{ .token_type = TokenType.INT, .literal = "5" },
+        Token{ .token_type = TokenType.LT, .literal = "<" },
+        Token{ .token_type = TokenType.INT, .literal = "10" },
+        Token{ .token_type = TokenType.GT, .literal = ">" },
+        Token{ .token_type = TokenType.INT, .literal = "5" },
+        Token{ .token_type = TokenType.SEMICOLON, .literal = ";" },
+
+        Token{ .token_type = TokenType.IF, .literal = "if" },
+        Token{ .token_type = TokenType.LPAREN, .literal = "(" },
+        Token{ .token_type = TokenType.INT, .literal = "5" },
+        Token{ .token_type = TokenType.LT, .literal = "<" },
+        Token{ .token_type = TokenType.INT, .literal = "10" },
+        Token{ .token_type = TokenType.RPAREN, .literal = ")" },
+        Token{ .token_type = TokenType.LBRACE, .literal = "{" },
+        Token{ .token_type = TokenType.RETURN, .literal = "return" },
+        Token{ .token_type = TokenType.TRUE, .literal = "true" },
+        Token{ .token_type = TokenType.SEMICOLON, .literal = ";" },
+        Token{ .token_type = TokenType.RBRACE, .literal = "}" },
+        Token{ .token_type = TokenType.ELSE, .literal = "else" },
+        Token{ .token_type = TokenType.LBRACE, .literal = "{" },
+        Token{ .token_type = TokenType.RETURN, .literal = "return" },
+        Token{ .token_type = TokenType.FALSE, .literal = "false" },
+        Token{ .token_type = TokenType.SEMICOLON, .literal = ";" },
+        Token{ .token_type = TokenType.RBRACE, .literal = "}" },
+
+        // 10 == 10;
+        Token{ .token_type = TokenType.INT, .literal = "10" },
+        Token{ .token_type = TokenType.EQ, .literal = "==" },
+        Token{ .token_type = TokenType.INT, .literal = "10" },
+        Token{ .token_type = TokenType.SEMICOLON, .literal = ";" },
+
+        // 10 != 9;
+        Token{ .token_type = TokenType.INT, .literal = "10" },
+        Token{ .token_type = TokenType.NOT_EQ, .literal = "!=" },
+        Token{ .token_type = TokenType.INT, .literal = "9" },
+        Token{ .token_type = TokenType.SEMICOLON, .literal = ";" },
+
         Token{ .token_type = TokenType.EOF, .literal = "" },
     };
     for (expected) |exp| {
         const t = code.nextToken();
-        //std.debug.print("Actual: {s}\t{s}\n", .{ @tagName(t.token_type), t.literal });
-        // std.debug.print("Expected: {s}\t{s}\n", .{ @tagName(exp.token_type), exp.literal });
+        // std.debug.print("Actual: {s}\tExpected:{s}\n", .{ @tagName(t.token_type), @tagName(exp.token_type) });
+        // std.debug.print("Actual: {s}\tExpected:{s}\n", .{ t.literal, exp.literal });
         try std.testing.expect(exp.token_type == t.token_type);
         try std.testing.expect(std.mem.eql(u8, exp.literal, t.literal));
     }
