@@ -24,3 +24,18 @@ pub fn main() !void {
         }
     }
 }
+
+test "Arraylist writer" {
+    var tmp = std.ArrayList(u8).init(std.testing.allocator);
+    defer tmp.deinit();
+    const writer = tmp.writer();
+
+    _ = try writer.write("123456789");
+    for (0..9) |i| {
+        const intt: u8 = @intCast(i);
+        const char_value: u8 = '1' + intt;
+        std.debug.print("{d}\n", .{tmp.items[i]});
+        std.debug.print("{d}\n", .{char_value});
+        try std.testing.expect(tmp.items[i] == char_value);
+    }
+}

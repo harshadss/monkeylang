@@ -2,46 +2,91 @@ const std = @import("std");
 const lexer = @import("lexer.zig");
 // AST object definitions
 
-pub const Expression = struct {}; // empty struct for now
+pub const Operator = enum {
+    assign,
+    plus,
+    minus,
+    bang,
+    asterisk,
+    slash,
+    equal,
+    notEqual,
+    gt,
+    lt,
+};
+
+pub const Expression = union(enum) {
+    identifier: Identifier,
+    prefixExpr: PrefixExpression,
+    infixExpr: InfixExpression,
+    integer: Integer,
+    boolean: Boolean,
+};
+
+pub const PrefixExpression = struct {
+    operator: Operator,
+    right: *const Expression,
+};
+
+pub const InfixExpression = struct {
+    left: *const Expression,
+    operator: Operator,
+    right: *const Expression,
+};
+
+pub const Integer = struct {
+    value: i64,
+};
+
+pub const Boolean = struct {
+    value: bool,
+};
 
 pub const Identifier = struct {
-    token: lexer.Token,
+    value: []const u8,
 };
 
 // bit of duplication with this, but so be it!
-pub const StatementTypes = enum { LET, RETURN };
+pub const StatementTypes = enum { LET, RETURN, EXPRESSION_STATEMENT };
 
 pub const Statement = union(StatementTypes) {
     LET: Let,
     RETURN: Return,
+    EXPRESSION_STATEMENT: ExpressionStatement,
 };
 
 pub const Let = struct {
-    name: ?Identifier,
-    value: ?Expression,
-    token: lexer.Token,
+    name: Identifier,
+    value: *Expression,
     const Self = @This();
 
-    pub fn print(self: Self) !void {
+    pub fn print(self: Self, buf: anytype) !void {
         // just print to debug for now
-        std.debug.print("Token Literal: {s}\tIdentifier name: {s}", .{ self.token.token_type, self.name.token.literal });
+        try buf.writeAll(self.token.literal);
+        try buf.writeAll(self.name.?.token.literal);
+        try buf.writeAll(" = ");
+        try buf.writeAll(" <some value> ;\n");
     }
 };
 
 pub const Return = struct {
-    value: ?Expression,
-    token: lexer.Token,
+    value: *Expression,
     const Self = @This();
-    pub fn print(_self: *Self) !void {
-        _ = _self;
-        // just print to debug for now
-        std.debug.print("Return statement");
+    pub fn print(self: *Self, buf: anytype) !void {
+        try buf.writeAll(self.token.literal);
+        try buf.writeAll("<some value>;\n");
     }
+};
+
+pub const ExpressionStatement = struct {
+    token: lexer.Token,
+    expression: Expression,
 };
 
 pub const Program = struct {
     allocator: std.mem.Allocator,
     statements: std.ArrayList(Statement),
+
     const Self = @This();
 
     pub fn init(allocator: std.mem.Allocator) Program {
