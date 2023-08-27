@@ -385,10 +385,11 @@ test "let statements" {
     }
 }
 
-test "return integers" {
+test "test return" {
     const input =
         \\ return 5;
         \\ return 10;
+        \\ return x;
     ;
     var allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer allocator.deinit();
@@ -400,6 +401,7 @@ test "return integers" {
 
     var expr1 = ast.Expression{ .integer = ast.Integer{ .value = 5 } };
     var expr2 = ast.Expression{ .integer = ast.Integer{ .value = 10 } };
+    var expr3 = ast.Expression{ .identifier = ast.Identifier{ .value = "x" } };
 
     const expected = [_]ast.Return{
         ast.Return{
@@ -407,6 +409,9 @@ test "return integers" {
         },
         ast.Return{
             .value = &expr2,
+        },
+        ast.Return{
+            .value = &expr3,
         },
     };
 
