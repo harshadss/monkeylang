@@ -226,10 +226,8 @@ pub const Parser = struct {
     }
 
     fn expectPeek(self: *Self, t: l.TokenType) bool {
-        // std.debug.print("R2D1: Current {s}\tPeek {s}\n", .{ self.curr_token.literal, self.peek_token.literal });
         if (self.peekTokenIs(t)) {
             self.nextToken();
-            // std.debug.print("R2D2: Current {s}\tPeek {s}\n", .{ self.curr_token.literal, self.peek_token.literal });
             return true;
         } else {
             self.nextError(t);
@@ -390,6 +388,7 @@ test "test return" {
         \\ return 5;
         \\ return 10;
         \\ return x;
+        \\ return 1 + 1;
     ;
     var allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer allocator.deinit();
@@ -402,6 +401,12 @@ test "test return" {
     var expr1 = ast.Expression{ .integer = ast.Integer{ .value = 5 } };
     var expr2 = ast.Expression{ .integer = ast.Integer{ .value = 10 } };
     var expr3 = ast.Expression{ .identifier = ast.Identifier{ .value = "x" } };
+    var expr_4_inner = ast.Expression{ .integer = ast.Integer{ .value = 1 } };
+    var expr4 = ast.Expression{ .infixExpr = ast.InfixExpression{
+        .left = &expr_4_inner,
+        .operator = ast.Operator.plus,
+        .right = &expr_4_inner,
+    } };
 
     const expected = [_]ast.Return{
         ast.Return{
@@ -412,6 +417,9 @@ test "test return" {
         },
         ast.Return{
             .value = &expr3,
+        },
+        ast.Return{
+            .value = &expr4,
         },
     };
 
