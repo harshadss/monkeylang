@@ -6,6 +6,7 @@ pub const ParserError = error{
     InvalidToken,
     MemoryAllocation,
     ExpectedInteger,
+    ExpectedBoolean,
     ExpectedIndentifier,
     ExpectedOperator,
 };
@@ -97,7 +98,7 @@ pub const Parser = struct {
             l.TokenType.LET => ast.Statement{ .LET = try self.parseLetStatement() },
             l.TokenType.RETURN => ast.Statement{ .RETURN = try self.parseReturnStatement() },
             else => {
-                std.debug.print("R2D2 {s}\n", .{@tagName(self.curr_token.token_type)});
+                // std.debug.print("R2D2 {s}\n", .{@tagName(self.curr_token.token_type)});
                 return ParserError.InvalidToken;
             },
         };
@@ -168,6 +169,14 @@ pub const Parser = struct {
         }
     }
 
+    fn parseBoolean(self: Self) ParserError!ast.Boolean {
+        return switch (self.curr_token.token_type) {
+            l.TokenType.TRUE => ast.Boolean{ .value = true },
+            l.TokenType.FALSE => ast.Boolean{ .value = false },
+            else => ParserError.ExpectedBoolean,
+        };
+    }
+
     fn parseExpression(self: *Self, priority: Priority) ParserError!ast.Expression {
         var leftExpression = try self.parseExpressionByPrefixToken();
 
@@ -213,9 +222,26 @@ pub const Parser = struct {
         return switch (self.curr_token.token_type) {
             l.TokenType.IDENT => ast.Expression{ .identifier = try self.parseIdentifier() },
             l.TokenType.INT => ast.Expression{ .integer = try self.parseInteger() },
+            l.TokenType.LPAREN => try self.parseGroupedExpression(),
             l.TokenType.BANG, l.TokenType.MINUS => ast.Expression{ .prefixExpr = try self.parsePrefixExpression() },
-            else => ParserError.InvalidToken,
+            l.TokenType.TRUE, l.TokenType.FALSE => ast.Expression{ .boolean = try self.parseBoolean() },
+            else => {
+                // std.debug.print("R2D2: {s}\n", .{self.curr_token.literal});
+                return ParserError.InvalidToken;
+            },
         };
+    }
+
+    // bracketed data, we parse the expression between brackets
+
+    fn parseGroupedExpression(self: *Self) ParserError!ast.Expression {
+        self.nextToken(); // skip over the parenthesis
+        const expression = try self.parseExpression(.lowest);
+        // skip over next bracket
+        if (!self.expectPeek(l.TokenType.RPAREN)) {
+            return ParserError.InvalidToken;
+        }
+        return expression;
     }
 
     fn parseInfixExpressionByToken(self: *Self, lftPtr: *ast.Expression) ParserError!ast.Expression {
@@ -250,6 +276,10 @@ pub const Parser = struct {
 };
 
 fn expectInteger(expected: *const ast.Integer, actual: *const ast.Integer) !void {
+    try std.testing.expectEqual(expected.value, actual.value);
+}
+
+fn expectBoolean(expected: *const ast.Boolean, actual: *const ast.Boolean) !void {
     try std.testing.expectEqual(expected.value, actual.value);
 }
 
@@ -349,6 +379,7 @@ test "let statements" {
         \\ let y = 5;
         \\ let x = 10;
         \\ let x = y;
+        \\ let x = true;
     ;
 
     var allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -362,6 +393,7 @@ test "let statements" {
     var expr1 = ast.Expression{ .integer = ast.Integer{ .value = 5 } };
     var expr2 = ast.Expression{ .integer = ast.Integer{ .value = 10 } };
     var expr3 = ast.Expression{ .identifier = ast.Identifier{ .value = "y" } };
+    var expr4 = ast.Expression{ .boolean = ast.Boolean{ .value = true } };
 
     const expected = [_]ast.Let{
         ast.Let{
@@ -376,6 +408,10 @@ test "let statements" {
             .name = ast.Identifier{ .value = "x" },
             .value = &expr3,
         },
+        ast.Let{
+            .name = ast.Identifier{ .value = "x" },
+            .value = &expr4,
+        },
     };
 
     for (expected, 0..) |exp, idx| {
@@ -389,6 +425,7 @@ test "test return" {
         \\ return 10;
         \\ return x;
         \\ return 1 + 1;
+        \\ return (1 + 1);
     ;
     var allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer allocator.deinit();
@@ -421,9 +458,40 @@ test "test return" {
         ast.Return{
             .value = &expr4,
         },
+        // same after grouping
+        ast.Return{
+            .value = &expr4,
+        },
     };
 
     for (expected, 0..) |exp, idx| {
         try expectReturnStatementByStatement(&exp, &prog.statements.items[idx]);
     }
+}
+
+test "nested expression" {
+    const input =
+        \\ return 5 + 3 * 2 ;
+        \\ return (5 + 3 * 2);
+    ;
+    var allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer allocator.deinit();
+
+    var lex = l.Lexer.new(input);
+    var parser = Parser.init(allocator.allocator(), &lex);
+    var prog: ast.Program = try parser.parseProgram();
+    defer prog.deinit();
+
+    var int_1 = ast.Expression{ .integer = ast.Integer{ .value = 5 } };
+    var int_2 = ast.Expression{ .integer = ast.Integer{ .value = 3 } };
+    var int_3 = ast.Expression{ .integer = ast.Integer{ .value = 2 } };
+    var part_1 = ast.Expression{ .infixExpr = ast.InfixExpression{ .left = &int_2, .right = &int_3, .operator = ast.Operator.asterisk } };
+    var part_2 = ast.Expression{ .infixExpr = ast.InfixExpression{ .left = &int_1, .right = &part_1, .operator = ast.Operator.plus } };
+
+    const expected = ast.Return{
+        .value = &part_2,
+    };
+
+    try expectReturnStatementByStatement(&expected, &prog.statements.items[0]);
+    try expectReturnStatementByStatement(&expected, &prog.statements.items[1]);
 }
